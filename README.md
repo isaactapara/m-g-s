@@ -51,5 +51,9 @@ The system is built to neutralize common POS attack vectors:
 - **Memory Safety**: Explicit management of setInterval and eventListeners to prevent orphans and leaks in long-running browser tabs.
 - **Double-Charge Protection**: UI-level hardware locking ensures single-path transaction execution.
 
+## Contribution & Credit
+
+**Solo Developer & Architect**: Isaac Tapara
+
 ---
 *Maintained internally by the Core Engineering Team.*

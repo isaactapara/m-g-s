@@ -62,13 +62,21 @@ const initiateSTKPush = async (req, res) => {
     }
     
     // Allow retry if status is NOT 'PENDING' or if it's already failed/cancelled
-    if (bill.checkoutRequestId && bill.status === 'PENDING') {
-       return res.status(400).json({ message: 'A payment request is already active for this bill.' });
+    // Allow retry after 1 minute if stuck in PENDING
+    const isRecentlyAttempted = bill.checkoutRequestId && 
+                               bill.status === 'PENDING' && 
+                               (new Date() - new Date(bill.updatedAt)) < 60000;
+
+    if (isRecentlyAttempted) {
+       return res.status(400).json({ message: 'A payment request is already active. Please wait 60 seconds.' });
     }
 
     const token = await generateToken();
     const timestamp = getTimestamp();
     const password = getPassword(timestamp);
+
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || 'https://fancy-toes-nail.loca.lt/api/payments/callback';
+    console.log(`📡 Using Callback URL: ${callbackUrl}`);
 
     const payload = {
       BusinessShortCode: process.env.MPESA_SHORTCODE,
@@ -79,7 +87,7 @@ const initiateSTKPush = async (req, res) => {
       PartyA: formattedPhone,
       PartyB: process.env.MPESA_SHORTCODE,
       PhoneNumber: formattedPhone,
-      CallBackURL: process.env.MPESA_CALLBACK_URL || 'https://fancy-toes-nail.loca.lt/api/payments/callback',
+      CallBackURL: callbackUrl,
       AccountReference: `MG-${billId.slice(-4)}`,
       TransactionDesc: 'MG Restaurant Hub Payment'
     };
@@ -87,7 +95,10 @@ const initiateSTKPush = async (req, res) => {
     const response = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       payload,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { 
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 45000 // 45s to handle slow sandbox
+      }
     );
 
     await Bill.findByIdAndUpdate(billId, { checkoutRequestId: response.data.CheckoutRequestID });
@@ -146,11 +157,37 @@ const handleCallback = async (req, res) => {
       const actualAmountPaid = Number(getMeta('Amount'));
       const rawDate = getMeta('TransactionDate');
 
-      // 1. Fetch the original bill to verify the total (Audit)
-      const pendingBill = await Bill.findOne({ checkoutRequestId });
+      // 1. Fetch the original bill (Linkage)
+      let pendingBill = await Bill.findOne({ checkoutRequestId });
       
+      if (!pendingBill && Number(resultCode) === 0) {
+        // [AUDIT] ORPHAN RECOVERY: If initiation timed out OR query was faster than webhook
+        console.log(`[?] Orphan/Stale callback for ${checkoutRequestId}. Attempting fuzzy match...`);
+        const phoneMatch = mpesaPhone;
+        const amountMatch = actualAmountPaid;
+        
+        if (phoneMatch && amountMatch) {
+          pendingBill = await Bill.findOne({
+            $or: [
+              { status: 'PENDING' },
+              { status: 'PAID', mpesaReceiptNumber: { $eq: null } },
+              { status: 'PAID', mpesaReceiptNumber: "" },
+              { status: 'PAID', mpesaReceiptNumber: { $exists: false } }
+            ],
+            total: { $gte: amountMatch - 1, $lte: amountMatch + 2 },
+            updatedAt: { $gt: new Date(Date.now() - 600000) } // Last 10 mins
+          }).sort({ updatedAt: -1 });
+
+          if (pendingBill) {
+            console.log(`✅ Fuzzy matched orchid callback to Bill ${pendingBill.billNumber} (Current Status: ${pendingBill.status})`);
+            pendingBill.checkoutRequestId = checkoutRequestId;
+            await pendingBill.save();
+          }
+        }
+      }
+
       if (!pendingBill) {
-        console.error(`Bill not found for Request ID: ${checkoutRequestId}`);
+        console.warn(`[!] No bill found for Request ID ${checkoutRequestId} even after fuzzy match.`);
         return res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });
       }
 
@@ -232,22 +269,37 @@ const checkTransactionStatus = async (req, res) => {
     );
 
     const { ResultCode, ResultDesc } = response.data;
-    console.log(`🔍 STK Query Result for Bill ${billId}: Code ${ResultCode} - ${ResultDesc}`);
+    console.log(`🔍 STK Query Full Response for ${billId}:`, JSON.stringify(response.data, null, 2));
 
     // Handle Query Results
     if (String(ResultCode) === '0') {
-      // It was successful. 
-      const billToUpdate = await Bill.findById(billId);
       const extractedId = ResultDesc.match(/[A-Z0-9]{10}/) ? ResultDesc.match(/[A-Z0-9]{10}/)[0] : null;
       
-      if (billToUpdate.status !== 'PAID') {
-        billToUpdate.status = 'PAID';
-        if (extractedId) billToUpdate.mpesaReceiptNumber = extractedId;
-        await billToUpdate.save();
-        console.log(`✅ Bill ${billId} status FORCED to PAID via STK Query Fallback`);
+      // If we found an ID in the query desc, update immediately
+      if (extractedId) {
+        const updatedBill = await Bill.findByIdAndUpdate(billId, { 
+          status: 'PAID',
+          mpesaReceiptNumber: extractedId
+        }, { returnDocument: 'after' });
+        return res.json({ status: 'PAID', bill: updatedBill });
       }
-      return res.json({ status: 'PAID', bill: billToUpdate });
-    } else if (String(ResultCode) === '1032') {
+      
+      // If we didn't find an ID, check if the billing record ALREADY has one (from webhook)
+      const existingBill = await Bill.findById(billId);
+      if (existingBill.mpesaReceiptNumber) {
+        existingBill.status = 'PAID';
+        await existingBill.save();
+        return res.json({ status: 'PAID', bill: existingBill });
+      }
+
+      // If still no ID, mark as PENDING_ID so frontend keeps polling
+      console.log(`[!] STK Query SUCCESS for ${billId} but MISSING ID. Waiting for webhook...`);
+      // Update status to PAID anyway so it shows up in settled bills, but return SUCCESS_PENDING_ID to frontend
+      existingBill.status = 'PAID';
+      await existingBill.save();
+      return res.json({ status: 'SUCCESS_PENDING_ID', bill: existingBill });
+    }
+ else if (String(ResultCode) === '1032') {
       await Bill.findByIdAndUpdate(billId, { status: 'CANCELLED', failureReason: 'Request cancelled by user' });
       return res.json({ status: 'CANCELLED' });
     } else if (String(ResultCode) === '0' || ['1037', '2001', 'CESS-1'].includes(String(ResultCode))) {

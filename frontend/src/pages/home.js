@@ -11,6 +11,7 @@ let mpesaStatus = null; // null, 'sending', 'pending', 'success', 'error'
 let mpesaError = '';
 let mpesaPhone = '';
 let pendingOrderData = null; // Store order while waiting for M-Pesa
+let activePollBillId = null; // Track current bill for status display
 
 function renderHome() {
   const isDarkMode = store.isDarkMode;
@@ -341,7 +342,7 @@ function renderHome() {
         </div>
 
         <h2 class="text-4xl font-black mb-4 tracking-tight">
-          ${mpesaStatus === 'sending' ? 'Initializing...' : ''}
+          ${mpesaStatus === 'sending' ? 'Sending Request...' : ''}
           ${mpesaStatus === 'pending' ? 'Waiting for PIN' : ''}
           ${mpesaStatus === 'verifying' ? 'Verifying Payment...' : ''}
           ${mpesaStatus === 'verifying_id' ? 'Finalizing Receipt...' : ''}
@@ -349,13 +350,31 @@ function renderHome() {
           ${mpesaStatus === 'error' ? 'Transaction Failed' : ''}
         </h2>
 
-        <p class="text-lg font-bold opacity-80 max-w-xs mx-auto">
-          ${mpesaStatus === 'sending' ? 'Connecting to M-Pesa Gateway...' : ''}
-          ${mpesaStatus === 'pending' ? `A prompt has been sent to <span class="underline">${mpesaPhone}</span>. Please complete it on your phone.<br/><span class="text-xs opacity-60">(Verification will follow automatically. It may take up to 30 seconds for the PIN to appear)</span>` : ''}
-          ${mpesaStatus === 'verifying' ? 'Verifying with Safaricom...' : ''}
-          ${mpesaStatus === 'success' ? 'Thank you! The bill has been marked as PAID.' : ''}
-          ${mpesaStatus === 'error' ? mpesaError : ''}
-        </p>
+        ${mpesaStatus === 'success' ? `
+            <div class="mt-8 p-6 bg-white/10 rounded-3xl border border-white/20 backdrop-blur-md">
+              <p class="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Transaction ID</p>
+              <p class="text-2xl font-black font-mono tracking-tighter">
+                ${(store.bills.find(b => (b.id === activePollBillId || b._id === activePollBillId))?.mpesaReceiptNumber) || 'Verifying ID...'}
+              </p>
+            </div>
+            <p class="mt-8 text-lg font-bold opacity-80 max-w-xs mx-auto">
+              Thank you! The bill has been marked as PAID.
+            </p>
+        ` : `
+            <p class="text-lg font-bold opacity-80 max-w-xs mx-auto">
+              ${mpesaStatus === 'sending' ? 'Connecting to M-Pesa Gateway...' : ''}
+              ${mpesaStatus === 'pending' ? `A prompt has been sent to <span class="underline">${mpesaPhone}</span>. Please complete it on your phone.` : ''}
+              ${mpesaStatus === 'verifying' ? 'Verifying with Safaricom...' : ''}
+              ${mpesaStatus === 'verifying_id' ? 'Finalizing Receipt...' : ''}
+              ${mpesaStatus === 'error' ? mpesaError : ''}
+            </p>
+        `}
+        
+        ${mpesaStatus === 'pending' ? `
+           <button onclick="window.mpesaStatus = 'verifying'; window.reRender();" class="mt-8 px-6 py-3 bg-white text-[#FF0000] rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg">
+              I have entered my PIN
+           </button>
+        ` : ''}
 
         ${mpesaStatus === 'pending' || mpesaStatus === 'processing' ? `
           <p class="mt-8 text-[10px] font-black uppercase tracking-widest opacity-50">Click anywhere to cancel</p>
@@ -478,6 +497,10 @@ window.triggerStkPush = () => {
   reRender();
 
   (async () => {
+    // Stage 1: Initializing
+    mpesaStatus = 'sending';
+    reRender();
+    
     if (!pendingOrderData) return;
     
     try {
@@ -498,6 +521,7 @@ window.triggerStkPush = () => {
       }
 
       if (billId && amount > 0) {
+        activePollBillId = billId;
         const res = await store.triggerStkPushApi(phone, amount, billId);
         
         if (res.ok) {

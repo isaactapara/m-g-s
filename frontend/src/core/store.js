@@ -35,10 +35,8 @@ class Store {
     this._isPaymentProcessing = false;
     this.pollingIntervals = {};
 
-    // Initial data fetch if logged in
-    if (this._currentUser) {
-      this.fetchInitialData();
-    }
+    // Polling starts immediately for responsiveness
+    this.fetchInitialData();
   }
 
   // Getters & Setters
@@ -318,8 +316,7 @@ class Store {
   }
 
   async pollBillStatus(billId, callback) {
-    // Initial wait to let the prompt appear and user react
-    await new Promise(r => setTimeout(r, 10000));
+    // Start polling immediately to be responsive
     
     return new Promise((resolve) => {
       let attempts = 0;
@@ -349,18 +346,18 @@ class Store {
             if (idx > -1) this._bills[idx] = updatedBill;
             this.notify();
             resolve({ success: true, bill: updatedBill });
+          } else if (status === 'SUCCESS_PENDING_ID') {
+            callback('verifying_id'); // Optimization: show user we are just waiting for the ID
           } else if (status === 'FAILED' || status === 'CANCELLED') {
              this.stopPolling(billId);
              resolve({ success: false, message: res.failureReason || 'Payment failed or was cancelled.' });
-          } else if (attempts > 12) {
-            callback('verifying_id'); 
-          } else if (attempts > 3) {
+          } else if (attempts > 5) {
             callback('verifying'); 
           }
         } catch (err) {
           console.error('Polling error:', err);
         }
-      }, 2000);
+      }, 2000); // 2s for responsiveness
     });
   }
 

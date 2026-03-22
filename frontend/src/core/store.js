@@ -243,7 +243,7 @@ class Store {
   // Bill Management
   async createBill(billData) {
     try {
-      // 🛡️ Payload Sanitization: Ensure items match backend schema precisely
+      // Payload Sanitization: Ensure items match backend schema precisely
       const sanitizedItems = billData.items.map(item => ({
         name: item.name,
         price: item.price,

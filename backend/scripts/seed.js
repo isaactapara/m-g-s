@@ -5,12 +5,12 @@ dotenv.config();
 
 const seedData = async () => {
   try {
-    console.log('🔗 Connecting to:', process.env.MONGODB_URI);
+    console.log('Connecting to:', process.env.MONGODB_URI);
     await mongoose.connect(process.env.MONGODB_URI, { 
       autoIndex: false,
       serverSelectionTimeoutMS: 10000 
     });
-    console.log('🌱 Connected to MongoDB.');
+    console.log('Connected to MongoDB.');
 
     // REQUIRE MODELS AFTER CONNECT
     const User = require('../models/User');
@@ -20,18 +20,18 @@ const seedData = async () => {
 
     await User.deleteMany({});
     await MenuItem.deleteMany({});
-    console.log('🧹 Database cleared.');
+    console.log('Database cleared.');
 
-    console.log('👤 Creating users...');
+    console.log('Creating users...');
     const users = [
       { username: 'admin', pin: await bcrypt.hash('0000', 10), role: 'owner' },
       { username: 'cashier1', pin: await bcrypt.hash('1234', 10), role: 'cashier' }
     ];
     
     await User.collection.insertMany(users.map(u => ({ ...u, createdAt: new Date(), updatedAt: new Date() })));
-    console.log('✅ Users created with hashed PINs');
+    console.log('Users created with hashed PINs');
 
-    console.log('🥘 Creating menu items...');
+    console.log('Creating menu items...');
     const menuData = [
       { name: 'Mandazi', price: 10, category: 'Snacks' },
       { name: 'Doughnut', price: 40, category: 'Snacks' },
@@ -75,11 +75,11 @@ const seedData = async () => {
 
     await MenuItem.insertMany(menuData);
     
-    console.log('✅ Menu items seeded.');
-    console.log('✨ Seeding Completed Successfully!');
+    console.log('Menu items seeded.');
+    console.log('Seeding Completed Successfully!');
     process.exit();
   } catch (error) {
-    console.log('❌ Seeding Failed!');
+    console.log('Seeding Failed!');
     console.log('Error Name:', error.name);
     console.log('Message:', error.message);
     process.exit(1);

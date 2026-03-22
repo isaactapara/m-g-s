@@ -163,7 +163,7 @@ const handleCallback = async (req, res) => {
             failureReason: `FRAUD ALERT: Expected ${pendingBill.total}, Received ${actualAmountPaid}`
           }
         );
-        console.log(`🚨 FRAUD ATTEMPT: Bill ${pendingBill.billNumber} paid ${actualAmountPaid} instead of ${pendingBill.total}`);
+        console.log(`FRAUD ATTEMPT: Bill ${pendingBill.billNumber} paid ${actualAmountPaid} instead of ${pendingBill.total}`);
         return res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });
       }
 
@@ -179,7 +179,7 @@ const handleCallback = async (req, res) => {
         }, 
         { returnDocument: 'after' }
       );
-      console.log(`✅ Payment verified. Receipt: ${mpesaReceipt}`);
+      console.log(`Payment verified. Receipt: ${mpesaReceipt}`);
     } else {
       const resultDesc = callbackData.ResultDesc;
       await Bill.findOneAndUpdate(
@@ -187,7 +187,7 @@ const handleCallback = async (req, res) => {
         { status: 'FAILED', failureReason: resultDesc }, 
         { returnDocument: 'after' }
       );
-      console.log(`❌ Payment failed: ${resultDesc}`);
+      console.log(`Payment failed: ${resultDesc}`);
     }
 
     res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });

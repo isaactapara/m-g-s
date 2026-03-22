@@ -320,15 +320,12 @@ class Store {
     
     return new Promise((resolve) => {
       let attempts = 0;
-      const maxAttempts = 15; // 15 attempts * 13s = ~3.25 mins total
+      let startTime = Date.now();
+      const maxDuration = 300000; // 5 minutes total
       
-      this.pollingIntervals[billId] = setInterval(async () => {
-        attempts++;
-        if (attempts > maxAttempts) {
-          this.stopPolling(billId);
-          resolve({ success: false, message: 'Payment timeout. Please check your phone or try again.' });
-          return;
-        }
+      const poll = async () => {
+        // Stop if globally cancelled or completed
+        if (!this.pollingIntervals[billId]) return;
 
         try {
           const res = await this.request('/payments/check-status', {
@@ -336,8 +333,9 @@ class Store {
             body: JSON.stringify({ billId })
           });
           
+          attempts++;
           const status = res.status;
-          const billData = res.bill || res; // Handle both {status, bill} and old direct bill formats
+          const billData = res.bill || res;
 
           if (status === 'PAID') {
             this.stopPolling(billId);
@@ -346,24 +344,37 @@ class Store {
             if (idx > -1) this._bills[idx] = updatedBill;
             this.notify();
             resolve({ success: true, bill: updatedBill });
+            return;
           } else if (status === 'SUCCESS_PENDING_ID') {
-            callback('verifying_id'); // Optimization: show user we are just waiting for the ID
+            if (callback) callback('verifying_id');
           } else if (status === 'FAILED' || status === 'CANCELLED') {
              this.stopPolling(billId);
              resolve({ success: false, message: res.failureReason || 'Payment failed or was cancelled.' });
-          } else if (attempts > 5) {
+             return;
+          } else if (Date.now() - startTime > maxDuration) {
+            this.stopPolling(billId);
+            resolve({ success: false, message: 'Payment verification timed out. Please check your phone or Settled Bills.' });
+            return;
+          } else if (attempts > 3 && callback) {
             callback('verifying'); 
           }
         } catch (err) {
-          console.error('Polling error:', err);
+          console.error('Polling network error (retrying):', err);
         }
-      }, 13000); // 13s to stay under Safaricom Sandbox limit (5 calls/min)
+
+        // Schedule next poll adaptive interval
+        const elapsed = Date.now() - startTime;
+        const nextInterval = elapsed < 45000 ? 5000 : 13000; // 5s for first 45s, then 13s
+        this.pollingIntervals[billId] = setTimeout(poll, nextInterval);
+      };
+
+      this.pollingIntervals[billId] = setTimeout(poll, 1000); // Start first poll after 1s
     });
   }
 
   stopPolling(billId) {
     if (this.pollingIntervals[billId]) {
-      clearInterval(this.pollingIntervals[billId]);
+      clearTimeout(this.pollingIntervals[billId]);
       delete this.pollingIntervals[billId];
     }
   }

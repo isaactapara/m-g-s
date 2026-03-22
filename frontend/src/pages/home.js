@@ -388,9 +388,14 @@ function renderHome() {
         ` : ''}
 
         ${(mpesaStatus === 'error' || mpesaStatus === 'duplicate') ? `
-          <button onclick="window.closeMpesaError()" class="mt-12 px-8 py-4 bg-white text-[#FF0000] rounded-2xl font-black uppercase tracking-widest hover:bg-gray-100 transition-colors">
-            Close & Try Again
-          </button>
+          <div class="mt-12 flex flex-col gap-3 w-full px-8">
+            <button onclick="window.handleMpesaSync()" class="w-full py-4 bg-white text-[#FF0000] rounded-2xl font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-transform">
+              Check Payment Again
+            </button>
+            <button onclick="window.closeMpesaError()" class="w-full py-4 bg-transparent border-2 border-white/30 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-white/10 transition-colors">
+              Close & Try Again
+            </button>
+          </div>
         ` : ''}
 
         ${mpesaStatus === 'sending' || mpesaStatus === 'pending' ? `
@@ -461,6 +466,41 @@ window.submitOrder = async (targetStatus = 'PAID') => {
     // You could add an error state here if needed
   }
   reRender();
+};
+
+window.handleMpesaSync = async () => {
+  const billId = pendingOrderData?.billId || pendingOrderData?._id;
+  if (!billId) return;
+
+  mpesaStatus = 'verifying';
+  reRender();
+
+  try {
+    const pollResult = await store.pollBillStatus(billId, (status) => {
+      mpesaStatus = status;
+      reRender();
+    });
+
+    if (pollResult.success) {
+      if (!pendingOrderData.billId) store.clearCart();
+      mpesaStatus = 'success';
+      reRender();
+      setTimeout(() => {
+        mpesaStatus = null;
+        pendingOrderData = null;
+        reRender();
+      }, 6000);
+    } else {
+      mpesaStatus = 'error';
+      mpesaError = pollResult.message;
+      reRender();
+    }
+  } catch (err) {
+    console.error('Manual Sync Error:', err);
+    mpesaStatus = 'error';
+    mpesaError = "Sync failed. Try again in 15 seconds.";
+    reRender();
+  }
 };
 
 window.promptPaymentMethod = (billId) => {
@@ -575,7 +615,9 @@ window.triggerStkPush = () => {
       reRender();
     } finally {
       store.isPaymentProcessing = false;
-      pendingOrderData = null;
+      if (mpesaStatus === 'success' || !mpesaStatus) {
+        pendingOrderData = null;
+      }
       reRender();
     }
   })();

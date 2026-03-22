@@ -101,7 +101,10 @@ const initiateSTKPush = async (req, res) => {
       }
     );
 
-    await Bill.findByIdAndUpdate(billId, { checkoutRequestId: response.data.CheckoutRequestID });
+    await Bill.findByIdAndUpdate(billId, { 
+      checkoutRequestId: response.data.CheckoutRequestID,
+      merchantRequestId: response.data.MerchantRequestID
+    });
     res.json(response.data);
   } catch (error) {
     const errorData = error.response?.data;
@@ -322,11 +325,18 @@ const checkTransactionStatus = async (req, res) => {
       return res.json({ status: 'SUCCESS_PENDING_ID', bill: existingBill });
     }
 
-    // Terminal Failures (Instant Feedback)
-    // We strictly wait for '0' (Success) or known "Waiting" codes
-    const waitingCodes = ['1037', 'CESS-1', 'CESS-3', '2001']; 
-    if (code !== '0' && !waitingCodes.includes(code)) {
-      console.log(`❌ Fail-Fast Triggered (Code ${code}): ${ResultDesc}`);
+    // Terminal Failures (Instant Feedback - BLACKLIST)
+    const terminalErrorCodes = [
+      '1',      // Insufficient Funds
+      '1032',   // Request cancelled by user
+      '1019',   // Transaction expired
+      '1031',   // Request ignored or user unavailable
+      '2001',   // Invalid initiator PIN (or similar authorization failure)
+      '9999'    // Internal Error
+    ];
+
+    if (code !== '0' && terminalErrorCodes.includes(code)) {
+      console.log(`❌ Terminal Failure Triggered (Code ${code}): ${ResultDesc}`);
       const failedBill = await Bill.findByIdAndUpdate(billId, { 
         status: 'FAILED', 
         failureReason: ResultDesc 
@@ -334,8 +344,9 @@ const checkTransactionStatus = async (req, res) => {
       return res.json({ status: 'FAILED', bill: failedBill });
     }
 
-    // If Code is in waitingCodes, we stay PENDING
-    return res.json({ status: 'PENDING', message: 'Waiting for PIN...' });
+    // Treat EVERYTHING ELSE (including unknowns) as PENDING to be safe
+    // This gives the callback more time to arrive even if query returned a weird code
+    return res.json({ status: 'PENDING', message: 'M-Pesa sync in progress...' });
 
   } catch (error) {
     const errorData = error.response?.data;

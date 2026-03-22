@@ -43,6 +43,10 @@ const billSchema = new mongoose.Schema({
   checkoutRequestId: {
     type: String,
     index: true // Optimized for Webhook lookups
+  },
+  merchantRequestId: {
+    type: String,
+    index: true // Traceability ID for Safaricom support calls
   }
 }, { timestamps: true });
 

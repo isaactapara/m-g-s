@@ -540,7 +540,7 @@ window.triggerStkPush = () => {
             setTimeout(() => {
               mpesaStatus = null;
               reRender();
-            }, 1000);
+            }, 6000); // Extended from 1s to 6s for visibility
           } else if (pollResult.message !== 'Polling cancelled.') {
             mpesaStatus = 'error';
             mpesaError = pollResult.message;
@@ -548,7 +548,7 @@ window.triggerStkPush = () => {
           }
         } else {
           mpesaStatus = 'error';
-          mpesaError = res.data?.message || res.data?.error?.customerMessage || 'Could not initiate payment. Please check if already paid.';
+          mpesaError = res.data?.customerMessage || res.data?.message || 'Safaricom is currently unavailable. Please try again.';
           reRender();
         }
       } else {

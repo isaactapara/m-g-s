@@ -104,8 +104,27 @@ const initiateSTKPush = async (req, res) => {
     await Bill.findByIdAndUpdate(billId, { checkoutRequestId: response.data.CheckoutRequestID });
     res.json(response.data);
   } catch (error) {
-    console.error('STK Push Error:', JSON.stringify(error.response?.data || error.message, null, 2));
-    res.status(500).json({ message: 'Failed to initiate M-Pesa payment', error: error.response?.data });
+    const errorData = error.response?.data;
+    console.error('STK Push Error:', JSON.stringify(errorData || error.message, null, 2));
+
+    // Specific Handling for Rate Limits / Spike Arrests
+    const errorMessage = errorData?.errorMessage || errorData?.message || "";
+    if (errorMessage.includes('SpikeArrest') || errorData?.errorCode === '400.002.02') {
+      return res.status(429).json({ 
+        message: 'M-Pesa system is cooling down. Please wait 10 seconds before retrying.',
+        code: 'RATE_LIMIT'
+      });
+    }
+
+    if (errorMessage.includes('Duplicate')) {
+       return res.status(400).json({ message: 'A similar request is already being processed. Please wait.' });
+    }
+
+    res.status(500).json({ 
+      message: 'Failed to initiate M-Pesa payment', 
+      error: errorData,
+      customerMessage: errorData?.customerMessage || 'M-Pesa Gateway is currently busy. Please try again.'
+    });
   }
 };
 
@@ -271,11 +290,12 @@ const checkTransactionStatus = async (req, res) => {
     const { ResultCode, ResultDesc } = response.data;
     console.log(`🔍 STK Query Full Response for ${billId}:`, JSON.stringify(response.data, null, 2));
 
-    // Handle Query Results
-    if (String(ResultCode) === '0') {
+    const code = String(ResultCode);
+
+    // Terminal Success
+    if (code === '0') {
       const extractedId = ResultDesc.match(/[A-Z0-9]{10}/) ? ResultDesc.match(/[A-Z0-9]{10}/)[0] : null;
       
-      // If we found an ID in the query desc, update immediately
       if (extractedId) {
         const updatedBill = await Bill.findByIdAndUpdate(billId, { 
           status: 'PAID',
@@ -284,7 +304,6 @@ const checkTransactionStatus = async (req, res) => {
         return res.json({ status: 'PAID', bill: updatedBill });
       }
       
-      // If we didn't find an ID, check if the billing record ALREADY has one (from webhook)
       const existingBill = await Bill.findById(billId);
       if (existingBill.mpesaReceiptNumber) {
         existingBill.status = 'PAID';
@@ -292,25 +311,39 @@ const checkTransactionStatus = async (req, res) => {
         return res.json({ status: 'PAID', bill: existingBill });
       }
 
-      // If still no ID, mark as PENDING_ID so frontend keeps polling
-      console.log(`[!] STK Query SUCCESS for ${billId} but MISSING ID. Waiting for webhook...`);
-      // Update status to PAID anyway so it shows up in settled bills, but return SUCCESS_PENDING_ID to frontend
       existingBill.status = 'PAID';
       await existingBill.save();
       return res.json({ status: 'SUCCESS_PENDING_ID', bill: existingBill });
     }
- else if (String(ResultCode) === '1032') {
-      await Bill.findByIdAndUpdate(billId, { status: 'CANCELLED', failureReason: 'Request cancelled by user' });
-      return res.json({ status: 'CANCELLED' });
-    } else if (String(ResultCode) === '0' || ['1037', '2001', 'CESS-1'].includes(String(ResultCode))) {
-      // 0 is handled above, but just in case
-      return res.json({ status: 'PENDING', message: 'Waiting for acknowledgement...' });
-    } else {
-      // For any other code during polling fallback, STAY PENDING.
-      // We only trust terminal success from ResultCode 0 or terminal failure from Webhook.
-      console.log(`STK Query returned code ${ResultCode} (${ResultDesc}) - Staying PENDING for now.`);
-      return res.json({ status: 'PENDING', message: ResultDesc });
+
+    // Terminal Failures (Instant Feedback)
+    const terminalFailures = [
+      '1',    // Insufficient Funds
+      '1032', // Cancelled by user
+      '1019', // Transaction expired
+      '1031', // Account locked
+      '2001', // Invalid PIN (Sandbox often treats this as terminal)
+      '9999'  // Internal Error
+    ];
+
+    if (terminalFailures.includes(code)) {
+      console.log(`❌ Terminal Failure Detected (Code ${code}): ${ResultDesc}`);
+      const failedBill = await Bill.findByIdAndUpdate(billId, { 
+        status: 'FAILED', 
+        failureReason: ResultDesc 
+      }, { returnDocument: 'after' });
+      return res.json({ status: 'FAILED', bill: failedBill });
     }
+
+    // Still Processing / Waiting
+    const waitingCodes = ['1037', '2001', 'CESS-1', 'CESS-2'];
+    if (waitingCodes.includes(code)) {
+      return res.json({ status: 'PENDING', message: 'Still waiting for your PIN...' });
+    }
+
+    // Catch-all: If it's a known error code but not terminal, stay pending for a bit longer
+    console.log(`STK Query returned non-terminal code ${code} (${ResultDesc})`);
+    return res.json({ status: 'PENDING', message: ResultDesc });
 
   } catch (error) {
     console.error('Status Query Error:', error.response?.data || error.message);

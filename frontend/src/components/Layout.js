@@ -92,7 +92,7 @@ export function renderLayout(contentHtml, currentPage = '/') {
       <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <!-- Top Header -->
         <header class="h-16 md:h-20 flex items-center justify-between px-4 md:px-8 border-b shrink-0 z-20 transition-colors ${
-          isDarkMode ? "bg-black/80 border-gray-900 backdrop-blur-md" : "bg-white/80 border-gray-100 backdrop-blur-md"
+          isDarkMode ? "bg-black border-gray-900" : "bg-white/80 border-gray-100 backdrop-blur-md"
         }">
           <div class="flex items-center gap-3">
             <button onclick="window.toggleSidebar()" class="md:hidden p-2.5 bg-gray-100 dark:bg-black border dark:border-gray-900 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-900 transition-colors">
@@ -114,7 +114,7 @@ export function renderLayout(contentHtml, currentPage = '/') {
           </div>
 
           <div class="flex items-center gap-4">
-             <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-inner ${isDarkMode ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-900"}">
+             <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-inner ${isDarkMode ? "bg-black border border-gray-800 text-white" : "bg-gray-100 text-gray-900"}">
                ${userRole ? userRole[0].toUpperCase() : ''}
              </div>
           </div>

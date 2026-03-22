@@ -43,7 +43,7 @@ function renderHome() {
       
       <!-- Top Stats Bar -->
       <div class="grid grid-cols-1">
-        <div class="p-6 rounded-[32px] border shadow-sm flex items-center justify-between gap-4 ${isDarkMode ? "bg-gray-950 border-gray-900" : "bg-white border-gray-100"}">
+        <div class="p-6 rounded-[32px] border shadow-sm flex items-center justify-between gap-4 ${isDarkMode ? "bg-black border-gray-900" : "bg-white border-gray-100"}">
           <div class="flex items-center gap-4">
             <div class="p-4 rounded-2xl bg-blue-500/10 text-blue-500"><i data-lucide="receipt" class="w-6 h-6"></i></div>
             <div>
@@ -79,8 +79,8 @@ function renderHome() {
                 return `
                   <div class="rounded-[24px] p-4 flex flex-col justify-between shadow-sm border-2 transition-all cursor-pointer h-[160px] relative overflow-hidden group ${
                       quantity > 0 
-                        ? "border-[#FF0000] " + (isDarkMode ? "bg-gray-900" : "bg-red-50/30") 
-                        : "border-transparent " + (isDarkMode ? "bg-gray-950" : "bg-gray-50")
+                        ? "border-[#FF0000] " + (isDarkMode ? "bg-neutral-950" : "bg-red-50/30") 
+                        : "border-transparent " + (isDarkMode ? "bg-black" : "bg-gray-50")
                   }" onclick="window.handleAdd('${item.id}')">
                     ${index === 0 ? `<div class="absolute -right-6 -top-6 w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center pointer-events-none group-hover:scale-110 transition-transform duration-500"><i data-lucide="flame" class="w-5 h-5 text-amber-500 ml-3 mt-3"></i></div>` : ''}
                     <div class="relative z-10">
@@ -317,7 +317,7 @@ function renderHome() {
     <!-- M-Pesa Status Overlay -->
     ${mpesaStatus ? `
       <div class="fixed inset-0 bg-[#FF0000]/95 backdrop-blur-xl z-[9999] flex flex-col items-center justify-center text-white px-8 text-center animate-in fade-in" 
-            onclick="window.cancelMpesa()"
+            onclick="window.cancelMpesa()">
         
         <div class="relative mb-12">
           ${mpesaStatus === 'sending' || mpesaStatus === 'pending' ? `
@@ -344,15 +344,15 @@ function renderHome() {
           ${mpesaStatus === 'sending' ? 'Initializing...' : ''}
           ${mpesaStatus === 'pending' ? 'Waiting for PIN' : ''}
           ${mpesaStatus === 'verifying' ? 'Verifying Payment...' : ''}
-          ${mpesaStatus === 'verifying_id' ? 'Finalizing Receipt ID...' : ''}
+          ${mpesaStatus === 'verifying_id' ? 'Finalizing Receipt...' : ''}
           ${mpesaStatus === 'success' ? 'Payment Verified!' : ''}
           ${mpesaStatus === 'error' ? 'Transaction Failed' : ''}
         </h2>
 
         <p class="text-lg font-bold opacity-80 max-w-xs mx-auto">
           ${mpesaStatus === 'sending' ? 'Connecting to M-Pesa Gateway...' : ''}
-          ${mpesaStatus === 'pending' ? `A prompt has been sent to <span class="underline">${mpesaPhone}</span>. Please complete it on your phone.` : ''}
-          ${mpesaStatus === 'verifying' ? 'Checking payment status with Safaricom. This may take a moment...' : ''}
+          ${mpesaStatus === 'pending' ? `A prompt has been sent to <span class="underline">${mpesaPhone}</span>. Please complete it on your phone.<br/><span class="text-xs opacity-60">(Verification will follow automatically. It may take up to 30 seconds for the PIN to appear)</span>` : ''}
+          ${mpesaStatus === 'verifying' ? 'Verifying with Safaricom...' : ''}
           ${mpesaStatus === 'success' ? 'Thank you! The bill has been marked as PAID.' : ''}
           ${mpesaStatus === 'error' ? mpesaError : ''}
         </p>
@@ -478,77 +478,70 @@ window.triggerStkPush = () => {
   reRender();
 
   (async () => {
-    if (pendingOrderData) {
-      try {
-        let billId = pendingOrderData.billId;
-        let amount = 0;
+    if (!pendingOrderData) return;
+    
+    try {
+      let billId = pendingOrderData.billId;
+      let amount = 0;
 
-        if (billId) {
-          const existingBill = store.bills.find(b => b.id === billId);
-          amount = existingBill ? existingBill.total : 0;
-        } else {
-          amount = pendingOrderData.total;
-          const newBill = await store.createBill({
-            ...pendingOrderData,
-            paymentMethod: 'M-Pesa',
-            status: 'PENDING'
-          });
-          billId = newBill ? newBill._id : null;
-        }
+      if (billId) {
+        const existingBill = store.bills.find(b => (b.id === billId || b._id === billId));
+        amount = existingBill ? existingBill.total : 0;
+      } else {
+        const newBill = await store.createBill({
+          ...pendingOrderData,
+          paymentMethod: 'M-Pesa',
+          status: 'PENDING'
+        });
+        billId = newBill ? (newBill._id || newBill.id) : null;
+        amount = newBill ? newBill.total : 0;
+      }
 
-        if (billId && amount > 0) {
-          const res = await store.triggerStkPushApi(phone, amount, billId);
-          
-          if (res.ok) {
-            mpesaStatus = 'pending';
-            reRender();
-
-            // Modified polling to handle status updates if we wanted to (but we'll just check i)
-            const pollResult = await store.pollBillStatus(billId, (status) => {
-              if (status === 'verifying') {
-                mpesaStatus = 'verifying';
-                reRender();
-              }
-            });
-            
-            if (mpesaStatus !== 'pending' && mpesaStatus !== 'verifying') return;
-
-            if (pollResult.success) {
-              if (!pendingOrderData.billId) store.clearCart();
-              mpesaStatus = 'success';
-              reRender();
-              setTimeout(() => {
-                mpesaStatus = null;
-                reRender();
-              }, 800);
-            } else if (pollResult.message !== 'Polling cancelled.') {
-              mpesaStatus = 'error';
-              mpesaError = pollResult.message;
-              reRender();
-            }
-          } else {
-            mpesaStatus = 'error';
-          mpesaError = res.data?.message || 'Transaction could not be initialized. Please check if it is already paid.';
+      if (billId && amount > 0) {
+        const res = await store.triggerStkPushApi(phone, amount, billId);
+        
+        if (res.ok) {
+          mpesaStatus = 'pending';
           reRender();
+
+          const pollResult = await store.pollBillStatus(billId, (status) => {
+            mpesaStatus = status;
+            reRender();
+          });
+          
+          if (pollResult.success) {
+            if (!pendingOrderData.billId) store.clearCart();
+            mpesaStatus = 'success';
+            reRender();
+            setTimeout(() => {
+              mpesaStatus = null;
+              reRender();
+            }, 1000);
+          } else if (pollResult.message !== 'Polling cancelled.') {
+            mpesaStatus = 'error';
+            mpesaError = pollResult.message;
+            reRender();
           }
         } else {
           mpesaStatus = 'error';
-          mpesaError = "Failed to synchronize bill data.";
+          mpesaError = res.data?.message || res.data?.error?.customerMessage || 'Could not initiate payment. Please check if already paid.';
           reRender();
         }
-      } catch (err) {
-        const msg = err.response?.data?.message || err.message;
-        const details = err.response?.data?.receivedBody;
-        console.error('M-Pesa Init Error Details:', msg, details);
+      } else {
         mpesaStatus = 'error';
-        mpesaError = msg || "System internal error. Please check logs.";
-        reRender();
-      } finally {
-        store.isPaymentProcessing = false;
+        mpesaError = "Failed to synchronize bill data.";
         reRender();
       }
+    } catch (err) {
+      console.error('M-Pesa Error:', err);
+      mpesaStatus = 'error';
+      mpesaError = err.response?.data?.message || err.message || "An unexpected error occurred.";
+      reRender();
+    } finally {
+      store.isPaymentProcessing = false;
+      pendingOrderData = null;
+      reRender();
     }
-    pendingOrderData = null;
   })();
 };
 

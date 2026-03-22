@@ -19,7 +19,7 @@ function renderSettings() {
   }
 
   const html = `
-    <div class="h-[calc(100vh-80px)] -m-4 md:-m-8 flex flex-col overflow-y-auto bg-gray-50/30 dark:bg-transparent p-4 md:p-8">
+    <div class="h-[calc(100vh-80px)] -m-4 md:-m-8 flex flex-col overflow-y-auto bg-gray-50/10 dark:bg-black p-4 md:p-8">
       <div class="max-w-4xl mx-auto w-full space-y-8">
         <!-- Header -->
         <div class="flex flex-col items-center select-none w-full border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"} pb-8">
@@ -31,7 +31,7 @@ function renderSettings() {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <!-- Create Cashier Form -->
           <div class="lg:col-span-1 space-y-6">
-            <form id="create-cashier-form" class="h-full p-8 rounded-[40px] border shadow-sm space-y-6 flex flex-col ${isDarkMode ? "bg-gray-950 border-gray-900" : "bg-white border-gray-100"}">
+            <form id="create-cashier-form" class="h-full p-8 rounded-[40px] border shadow-sm space-y-6 flex flex-col ${isDarkMode ? "bg-black border-gray-900" : "bg-white border-gray-100"}">
               <div>
                  <div class="w-12 h-12 bg-red-100 text-[#FF0000] dark:bg-red-500/10 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
                     <i data-lucide="user-plus" class="w-6 h-6"></i>
@@ -82,7 +82,7 @@ function renderSettings() {
 
           <!-- Active Staff List -->
           <div class="lg:col-span-2">
-            <div class="h-full rounded-[40px] border shadow-sm flex flex-col overflow-hidden ${isDarkMode ? "bg-gray-950 border-gray-900" : "bg-white border-gray-100"}">
+            <div class="h-full rounded-[40px] border shadow-sm flex flex-col overflow-hidden ${isDarkMode ? "bg-black border-gray-900" : "bg-white border-gray-100"}">
               <div class="p-8 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}">
                  <h4 class="font-black text-xl tracking-tight ${isDarkMode ? "text-white" : "text-gray-900"}">Active Accounts</h4>
                  <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Manage system access</p>

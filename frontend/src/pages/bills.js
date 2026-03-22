@@ -45,7 +45,7 @@ function renderBills() {
                 onclick="window.setFilterStatus('${status}')"
                 class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   filterStatus === status 
-                    ? "bg-white dark:bg-gray-950 text-[#FF0000] shadow-sm border dark:border-gray-900" 
+                    ? "bg-white dark:bg-black text-[#FF0000] shadow-sm border dark:border-gray-900" 
                     : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 }"
               >
@@ -63,7 +63,7 @@ function renderBills() {
               id="search-input"
               placeholder="Search by Bill # or Dish..."
               value="${search}"
-              class="pl-10 pr-4 py-2.5 rounded-xl text-sm font-medium w-64 transition-all focus:ring-2 focus:ring-[#FF0000] focus:outline-none ${isDarkMode ? "bg-gray-900 border-transparent text-white" : "bg-gray-100 border-transparent text-gray-900"}"
+              class="pl-10 pr-4 py-2.5 rounded-xl text-sm font-medium w-64 transition-all focus:ring-2 focus:ring-[#FF0000] focus:outline-none ${isDarkMode ? "bg-black border border-gray-900 text-white" : "bg-gray-100 border-transparent text-gray-900"}"
             />
           </div>
           ${userRole === 'owner' ? `
@@ -80,7 +80,7 @@ function renderBills() {
           <div class="overflow-x-auto w-full">
           <table class="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr class="border-b text-[10px] font-black uppercase tracking-widest ${isDarkMode ? "bg-gray-800/50 border-gray-800 text-gray-500" : "bg-gray-50 border-gray-100 text-gray-400"}">
+              <tr class="border-b text-[10px] font-black uppercase tracking-widest ${isDarkMode ? "bg-black border-gray-800 text-gray-500" : "bg-gray-50 border-gray-100 text-gray-400"}">
                 <th class="px-6 py-4 px-2">Bill Number</th>
                 <th class="px-6 py-4 px-2">Date & Time</th>
                 <th class="px-6 py-4 px-2">Items</th>

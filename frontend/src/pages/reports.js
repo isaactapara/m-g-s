@@ -202,7 +202,7 @@ function renderReports() {
 
   const html = `
     <!-- Wrapper with ID for PDF Exporting -->
-    <div id="report-container" class="lg:h-[calc(100vh-80px)] -m-4 md:-m-8 flex flex-col pt-4 md:pt-0 overflow-y-auto bg-gray-50/30 dark:bg-transparent p-4 md:p-8 space-y-6 md:space-y-8 relative">
+    <div id="report-container" class="lg:h-[calc(100vh-80px)] flex-1 flex flex-col pt-4 md:pt-0 overflow-hidden bg-gray-50/10 dark:bg-black p-4 md:p-8 space-y-6 md:space-y-8 relative">
       
       <!-- Header -->
       <div class="flex flex-col items-center select-none w-full border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"} pb-6">
@@ -215,7 +215,7 @@ function renderReports() {
         </div>
       </div>
         <div class="flex flex-wrap items-center gap-2 md:gap-3 w-full sm:w-auto">
-          <div class="relative flex-1 sm:flex-none flex items-center bg-white dark:bg-gray-950 border dark:border-gray-900 rounded-2xl shadow-sm px-4 transition-all hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer">
+          <div class="relative flex-1 sm:flex-none flex items-center ${isDarkMode ? "bg-black dark:bg-black text-[#FF0000] shadow-sm border dark:border-gray-900" : "bg-white"} rounded-2xl shadow-sm px-4 transition-all hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer">
              <i data-lucide="calendar" class="w-4 h-4 text-[#FF0000] absolute left-4 pointer-events-none"></i>
              <select 
                onchange="window.setTimeframe(this.value)"

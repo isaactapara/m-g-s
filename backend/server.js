@@ -46,6 +46,15 @@ app.get('/', (req, res) => {
   res.json({ message: 'M&G Restaurant Hub API is Live' });
 });
 
+// Error Handler
+app.use((err, req, res, next) => {
+  console.error('SERVER ERROR:', err.stack || err.message || err);
+  res.status(err.status || 500).json({ 
+    message: err.message || 'Internal Server Error',
+    error: process.env.NODE_ENV === 'development' ? err : {}
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
@@ -56,6 +65,7 @@ app.listen(PORT, async () => {
       const tunnel = await localtunnel({ port: PORT });
       console.log(`🌍 M-Pesa Webhook Tunnel Active: ${tunnel.url}`);
       process.env.MPESA_CALLBACK_URL = `${tunnel.url}/api/payments/callback`;
+      console.log(`🔗 Webhook Callback URL: ${process.env.MPESA_CALLBACK_URL}`);
       
       tunnel.on('close', () => console.log('Tunnel closed'));
     } catch (err) {

@@ -46,9 +46,11 @@ const initiateSTKPush = async (req, res) => {
   const { phone, amount, billId } = req.body;
   if (!phone || !amount || !billId) return res.status(400).json({ message: 'Missing required fields' });
 
-  let formattedPhone = phone;
+  let formattedPhone = String(phone).trim();
   if (formattedPhone.startsWith('0')) formattedPhone = `254${formattedPhone.slice(1)}`;
   if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
+  
+  console.log(`🚀 Initiating STK Push for ${formattedPhone} (Amt: ${amount}, Bill: ${billId})`);
 
   try {
     const bill = await Bill.findById(billId);
@@ -77,7 +79,7 @@ const initiateSTKPush = async (req, res) => {
       PartyA: formattedPhone,
       PartyB: process.env.MPESA_SHORTCODE,
       PhoneNumber: formattedPhone,
-      CallBackURL: process.env.MPESA_CALLBACK_URL || 'https://mg-restaurant-callback.loca.lt/api/payments/callback',
+      CallBackURL: process.env.MPESA_CALLBACK_URL || 'https://fancy-toes-nail.loca.lt/api/payments/callback',
       AccountReference: `MG-${billId.slice(-4)}`,
       TransactionDesc: 'MG Restaurant Hub Payment'
     };
@@ -230,30 +232,32 @@ const checkTransactionStatus = async (req, res) => {
     );
 
     const { ResultCode, ResultDesc } = response.data;
+    console.log(`🔍 STK Query Result for Bill ${billId}: Code ${ResultCode} - ${ResultDesc}`);
 
     // Handle Query Results
     if (String(ResultCode) === '0') {
       // It was successful. 
-      const billAfterUpdate = await Bill.findById(billId);
-      
-      // FALLBACK ID RECOVERY: Extract from text description if ID is missing
+      const billToUpdate = await Bill.findById(billId);
       const extractedId = ResultDesc.match(/[A-Z0-9]{10}/) ? ResultDesc.match(/[A-Z0-9]{10}/)[0] : null;
-
-      if (billAfterUpdate.status !== 'PAID' || (extractedId && !billAfterUpdate.mpesaReceiptNumber)) {
-        billAfterUpdate.status = 'PAID';
-        if (extractedId) billAfterUpdate.mpesaReceiptNumber = extractedId;
-        await billAfterUpdate.save();
+      
+      if (billToUpdate.status !== 'PAID') {
+        billToUpdate.status = 'PAID';
+        if (extractedId) billToUpdate.mpesaReceiptNumber = extractedId;
+        await billToUpdate.save();
+        console.log(`✅ Bill ${billId} status FORCED to PAID via STK Query Fallback`);
       }
-      return res.json({ status: 'PAID', bill: billAfterUpdate, message: 'Payment confirmed' });
-    }
- else if (ResultCode === '1032') {
+      return res.json({ status: 'PAID', bill: billToUpdate });
+    } else if (String(ResultCode) === '1032') {
       await Bill.findByIdAndUpdate(billId, { status: 'CANCELLED', failureReason: 'Request cancelled by user' });
       return res.json({ status: 'CANCELLED' });
-    } else if (ResultCode === '1037') {
-      return res.json({ status: 'PENDING', message: 'Timeout. Result not yet available' });
+    } else if (String(ResultCode) === '0' || ['1037', '2001', 'CESS-1'].includes(String(ResultCode))) {
+      // 0 is handled above, but just in case
+      return res.json({ status: 'PENDING', message: 'Waiting for acknowledgement...' });
     } else {
-      await Bill.findByIdAndUpdate(billId, { status: 'FAILED', failureReason: ResultDesc });
-      return res.json({ status: 'FAILED', message: ResultDesc });
+      // For any other code during polling fallback, STAY PENDING.
+      // We only trust terminal success from ResultCode 0 or terminal failure from Webhook.
+      console.log(`STK Query returned code ${ResultCode} (${ResultDesc}) - Staying PENDING for now.`);
+      return res.json({ status: 'PENDING', message: ResultDesc });
     }
 
   } catch (error) {

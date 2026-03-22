@@ -301,7 +301,6 @@ class Store {
 
   // Payment Management
   async triggerStkPushApi(phoneNumber, amount, billId) {
-    if (this.isPaymentProcessing) return { ok: false, data: { message: 'Processing an active payment request.' } };
     try {
       const data = await this.request('/payments/stk-push', {
         method: 'POST',
@@ -319,9 +318,12 @@ class Store {
   }
 
   async pollBillStatus(billId, callback) {
+    // Initial wait to let the prompt appear and user react
+    await new Promise(r => setTimeout(r, 10000));
+    
     return new Promise((resolve) => {
       let attempts = 0;
-      const maxAttempts = 60; // 2 minutes with 2s interval
+      const maxAttempts = 50; 
       
       this.pollingIntervals[billId] = setInterval(async () => {
         attempts++;
@@ -332,23 +334,28 @@ class Store {
         }
 
         try {
-          const bill = await this.request('/payments/check-status', {
+          const res = await this.request('/payments/check-status', {
             method: 'POST',
             body: JSON.stringify({ billId })
           });
           
-          if (bill.status === 'PAID') {
+          const status = res.status;
+          const billData = res.bill || res; // Handle both {status, bill} and old direct bill formats
+
+          if (status === 'PAID') {
             this.stopPolling(billId);
-            const updatedBill = this.normalizeBill(bill);
-            const idx = this._bills.findIndex(b => b._id === billId || b.id === billId);
+            const updatedBill = this.normalizeBill(billData);
+            const idx = this._bills.findIndex(b => (b._id || b.id) === billId);
             if (idx > -1) this._bills[idx] = updatedBill;
             this.notify();
             resolve({ success: true, bill: updatedBill });
-          } else if (bill.status === 'FAILED' || bill.status === 'CANCELLED') {
+          } else if (status === 'FAILED' || status === 'CANCELLED') {
              this.stopPolling(billId);
-             resolve({ success: false, message: bill.failureReason || 'Payment failed or was cancelled.' });
-          } else if (attempts > 5) {
-            callback('verifying'); // Tell UI we are still waiting
+             resolve({ success: false, message: res.failureReason || 'Payment failed or was cancelled.' });
+          } else if (attempts > 12) {
+            callback('verifying_id'); 
+          } else if (attempts > 3) {
+            callback('verifying'); 
           }
         } catch (err) {
           console.error('Polling error:', err);
@@ -396,8 +403,8 @@ class Store {
       this.notify();
       return { success: true, message: `Staff character '${username}' provisioned successfully!` };
     } catch (err) {
-      console.error('Add User Error:', err);
       const msg = err.response?.data?.message || 'Failed to create user. Please check if username exists.';
+      console.error('Add User Error:', msg, err);
       return { success: false, message: msg };
     }
   }

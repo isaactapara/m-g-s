@@ -79,7 +79,7 @@ const updateBillStatus = async (req, res) => {
     const bill = await Bill.findByIdAndUpdate(
       req.params.id, 
       { status, paymentMethod }, 
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!bill) return res.status(404).json({ message: 'Bill not found' });
     res.json(bill);

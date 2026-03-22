@@ -9,26 +9,25 @@ function renderLogin() {
 
   const html = `
     <div class="flex items-center justify-center min-h-screen w-full transition-colors duration-300 p-6 ${isDarkMode ? "bg-black" : "bg-gray-50"}">
-      <div class="w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? "bg-gray-950 border border-gray-900" : "bg-white border border-gray-100"}">
+      <div class="w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? "bg-black border border-gray-900" : "bg-white border border-gray-100"}">
         <div class="p-12 flex flex-col items-center">
-          <div class="mb-8 relative flex justify-center w-full">
-            <div class="absolute inset-0 bg-white/40 dark:bg-white/10 blur-[60px] rounded-full scale-150"></div>
-            <img src="/brand-logo-v2.png" alt="M&G Logo" class="relative w-56 h-56 object-contain dark:drop-shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-transform hover:scale-105 duration-500" />
+          <div class="mb-12 relative flex justify-center w-full">
+            <img src="/brand-logo-v2.png" alt="M&G Logo" class="relative w-64 h-64 object-contain dark:drop-shadow-[0_0_50px_rgba(255,255,255,0.05)] transition-transform hover:scale-105 duration-500" />
           </div>
           
           <div class="flex flex-col items-center select-none">
-            <span class="text-[11px] font-black uppercase tracking-[1em] text-gray-400 dark:text-gray-500 mb-1 ml-[1em]">THE</span>
-            <h1 class="text-8xl font-[900] text-[#FF0000] tracking-tighter leading-[0.85] mb-2 drop-shadow-sm">M&G's</h1>
-            <div class="flex items-center gap-4 w-full">
-              <div class="h-px bg-gray-200 dark:bg-gray-800 flex-1"></div>
-              <span class="text-[14px] font-black uppercase tracking-[0.6em] text-gray-900 dark:text-white whitespace-nowrap ml-[0.6em]">RESTAURANT</span>
-              <div class="h-px bg-gray-200 dark:bg-gray-800 flex-1"></div>
+            <span class="text-[11px] font-black uppercase tracking-[1em] text-gray-400 dark:text-gray-400 mb-1 ml-[1em]">THE</span>
+            <h1 class="text-8xl font-[900] text-[#FF0000] tracking-tighter leading-[0.85] mb-2 drop-shadow-sm select-none">M&G's</h1>
+            <div class="flex items-center gap-4 w-full px-2">
+              <div class="h-px bg-gray-200 dark:bg-neutral-800 flex-1"></div>
+              <span class="text-[15px] font-black uppercase tracking-[0.5em] ${isDarkMode ? "text-white" : "text-gray-900"} whitespace-nowrap">RESTAURANT</span>
+              <div class="h-px bg-gray-200 dark:bg-neutral-800 flex-1"></div>
             </div>
           </div>
 
           <form id="login-form" class="w-full space-y-6">
             <div class="space-y-2">
-              <label class="block text-xs font-black uppercase tracking-widest ml-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}">
+              <label class="block text-xs font-black uppercase tracking-widest ml-1 ${isDarkMode ? "text-gray-400" : "text-gray-400"}">
                 Username
               </label>
               <div class="relative group">
@@ -37,13 +36,13 @@ function renderLogin() {
                   type="text" 
                   id="username"
                   placeholder="Enter username"
-                  class="w-full pl-14 pr-5 py-5 rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-[#FF0000] focus:outline-none ${isDarkMode ? "bg-gray-900 border-transparent text-white" : "bg-gray-100 border-transparent text-gray-900"}"
+                  class="w-full pl-14 pr-5 py-5 rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-[#FF0000] focus:outline-none ${isDarkMode ? "bg-black border border-neutral-800 text-white" : "bg-gray-100 border-transparent text-gray-900"}"
                 />
               </div>
             </div>
 
             <div class="space-y-2">
-              <label class="block text-xs font-black uppercase tracking-widest ml-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}">
+              <label class="block text-xs font-black uppercase tracking-widest ml-1 ${isDarkMode ? "text-gray-400" : "text-gray-400"}">
                 Security PIN
               </label>
               <div class="relative group">
@@ -52,7 +51,7 @@ function renderLogin() {
                   type="${showPassword ? 'text' : 'password'}" 
                   id="password"
                   placeholder="Enter security PIN"
-                  class="w-full pl-14 pr-14 py-5 rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-[#FF0000] focus:outline-none ${isDarkMode ? "bg-gray-900 border-transparent text-white" : "bg-gray-100 border-transparent text-gray-900"}"
+                  class="w-full pl-14 pr-14 py-5 rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-[#FF0000] focus:outline-none ${isDarkMode ? "bg-black border border-neutral-800 text-white" : "bg-gray-100 border-transparent text-gray-900"}"
                 />
                 <button 
                   type="button"

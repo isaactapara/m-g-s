@@ -52,7 +52,7 @@ function renderTables() {
           </div>
 
           <div class="flex gap-3 pointer-events-auto">
-            ${store.userRole === 'owner' && isEditMode ? `
+            ${(store.userRole === 'owner' || store.userRole === 'cashier') && isEditMode ? `
                <button id="add-table-btn" onclick="window.addTable()" class="px-5 py-2.5 bg-gray-100 dark:bg-black border dark:border-gray-900 text-gray-700 dark:text-gray-300 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-900 transition-colors shadow-sm flex items-center gap-2">
                  <i data-lucide="plus" class="w-4 h-4 inline-block -mt-1 mr-1"></i> Add Table
                </button>
@@ -62,8 +62,8 @@ function renderTables() {
               onclick="window.toggleEditMode()"
               class="px-6 py-3 rounded-2xl text-sm font-black transition-all flex items-center gap-2 shadow-xl backdrop-blur-md ${
                 isEditMode 
-                  ? "bg-indigo-500 text-white shadow-indigo-500/30 hover:bg-indigo-600" 
-                  : "bg-white/80 dark:bg-black/80 text-gray-800 dark:text-white hover:bg-white border border-gray-200 dark:border-gray-900"
+                  ? "bg-indigo-600 text-white shadow-indigo-600/30 hover:bg-indigo-700" 
+                  : "bg-white/80 dark:bg-black/50 text-gray-800 dark:text-white hover:bg-white border border-gray-200 dark:border-gray-800"
               }"
             >
               <i data-lucide="${isEditMode ? 'save' : 'move'}" class="w-4 h-4"></i> 
@@ -90,7 +90,7 @@ function renderTables() {
                 selectedTableId === table.id && !isEditMode
                   ? "border-[#FF0000] ring-8 ring-[#FF0000]/10 z-20 scale-110" 
                   : "border-transparent z-10 scale-100"
-              } ${isEditMode ? "hover:scale-105 cursor-grab active:cursor-grabbing border-dashed border-indigo-400 hover:border-indigo-500 bg-white/90 dark:bg-gray-800/90 text-gray-900 dark:text-white hover:shadow-2xl hover:shadow-indigo-500/20" : "hover:-translate-y-1 hover:shadow-2xl cursor-pointer"}"
+              } ${isEditMode ? "hover:scale-105 cursor-grab active:cursor-grabbing border-dashed border-indigo-400 hover:border-indigo-500 bg-white/90 dark:bg-black/80 text-gray-900 dark:text-white hover:shadow-2xl hover:shadow-indigo-500/20" : "hover:-translate-y-1 hover:shadow-2xl cursor-pointer"} ${table.status === 'OCCUPIED' && !isEditMode ? 'animate-pulse shadow-[#FF0000]/10' : ''}"
               style="left: ${table.position?.x ?? table.x ?? 0}px; top: ${table.position?.y ?? table.y ?? 0}px; transform-origin: center center;"
               data-id="${table.id}"
             >
@@ -103,7 +103,7 @@ function renderTables() {
                     <i data-lucide="pencil" class="w-3 h-3"></i>
                   </button>
                 </div>
-                <div class="absolute -top-3 -left-3 bg-white dark:bg-gray-800 text-gray-400 p-2 rounded-full shadow-lg border dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <div class="absolute -top-3 -left-3 bg-white dark:bg-black text-gray-400 p-2 rounded-full shadow-lg border dark:border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                   <i data-lucide="grip-horizontal" class="w-3 h-3"></i>
                 </div>
               ` : ''}
@@ -118,7 +118,7 @@ function renderTables() {
       </div>
 
       <!-- Control Sidebar -->
-      <div class="w-full xl:w-[450px] flex flex-col shadow-2xl z-20 transition-transform duration-500 overflow-y-auto ${isDarkMode ? "bg-black/95 border-l border-gray-900" : "bg-white border-l border-gray-200"}">
+      <div class="w-full xl:w-[450px] flex flex-col shadow-2xl z-20 transition-transform duration-500 overflow-y-auto backdrop-blur-xl ${isDarkMode ? "bg-black/80 border-l border-white/5" : "bg-white border-l border-gray-200"}">
         ${selectedTable ? `
           <div class="p-8 h-full flex flex-col animate-in slide-in-from-right-8 fade-in duration-500">
             <!-- Header -->
@@ -144,7 +144,7 @@ function renderTables() {
                   </div>
                 </div>
               </div>
-              <button onclick="window.closeSidebar()" class="p-3 bg-gray-100 dark:bg-black border dark:border-gray-900 rounded-2xl text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+              <button onclick="window.closeSidebar()" class="p-3 bg-gray-100 dark:bg-black border dark:border-gray-800 rounded-2xl text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                  <i data-lucide="x" class="w-5 h-5"></i>
               </button>
             </div>
@@ -159,7 +159,7 @@ function renderTables() {
                 class="relative overflow-hidden w-full p-6 rounded-[2rem] border-2 transition-all group text-left ${
                   selectedTable.status === 'FREE' 
                     ? "border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20 ring-4 ring-green-500/10" 
-                    : "border-transparent bg-gray-50 dark:bg-gray-800 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-800/50"
+                    : "border-transparent bg-gray-50 dark:bg-black border dark:border-gray-800 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-800/50"
                 }"
               >
                 <div class="flex items-center gap-5 relative z-10">
@@ -180,7 +180,7 @@ function renderTables() {
                 class="relative overflow-hidden w-full p-6 rounded-[2rem] border-2 transition-all group text-left ${
                   selectedTable.status === 'OCCUPIED' 
                     ? "border-[#FF0000] bg-red-500/10 shadow-lg shadow-red-500/20 ring-4 ring-red-500/10" 
-                    : "border-transparent bg-gray-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800/50"
+                    : "border-transparent bg-gray-50 dark:bg-black border dark:border-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800/50"
                 }"
               >
                 <div class="flex items-center gap-5 relative z-10">
@@ -201,7 +201,7 @@ function renderTables() {
                 class="relative overflow-hidden w-full p-6 rounded-[2rem] border-2 transition-all group text-left ${
                   selectedTable.status === 'PENDING' 
                     ? "border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/20 ring-4 ring-amber-500/10" 
-                    : "border-transparent bg-gray-50 dark:bg-gray-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-200 dark:hover:border-amber-800/50"
+                    : "border-transparent bg-gray-50 dark:bg-black border dark:border-gray-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-200 dark:hover:border-amber-800/50"
                 }"
               >
                 <div class="flex items-center gap-5 relative z-10">
@@ -248,7 +248,7 @@ function renderTables() {
       <!-- Edit Name Modal -->
       ${editingTableNameId ? `
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center animate-in fade-in" onclick="window.closeEditModal()">
-           <div class="bg-white dark:bg-gray-950 p-8 rounded-[2rem] shadow-2xl border dark:border-gray-900 w-full max-w-sm flex flex-col gap-6" onclick="event.stopPropagation()">
+           <div class="bg-white dark:bg-black p-8 rounded-[2rem] shadow-2xl border dark:border-gray-800 w-full max-w-sm flex flex-col gap-6" onclick="event.stopPropagation()">
               <div>
                 <h3 class="text-2xl font-black ${isDarkMode ? "text-white" : "text-gray-900"}">Rename Table</h3>
                 <p class="text-xs font-bold text-gray-500 mt-1">Give this table a custom identifier</p>
@@ -257,7 +257,7 @@ function renderTables() {
                 type="text" 
                 id="edit-table-name"
                 value="${store.tables.find(t => t.id === editingTableNameId)?.name || store.tables.find(t => t.id === editingTableNameId)?.number || ''}"
-                class="w-full p-4 rounded-2xl font-black text-lg transition-all focus:ring-4 focus:ring-indigo-500/20 focus:outline-none ${isDarkMode ? "bg-black text-white border-gray-900" : "bg-gray-50 text-gray-900 border-gray-200"} border"
+                class="w-full p-4 rounded-2xl font-black text-lg transition-all focus:ring-4 focus:ring-indigo-500/20 focus:outline-none ${isDarkMode ? "bg-black text-white border-gray-800 shadow-inner" : "bg-gray-50 text-gray-900 border-gray-200"} border"
               />
               <div class="flex gap-3">
                 <button onclick="window.closeEditModal()" class="flex-1 py-4 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Cancel</button>
@@ -376,8 +376,8 @@ function attachListeners() {
 }
 
 window.toggleEditMode = () => {
-  if (store.userRole !== 'owner') {
-    accessError = 'Access Restricted: Only owners can edit the floor plan.';
+  if (store.userRole !== 'owner' && store.userRole !== 'cashier') {
+    accessError = 'Access Restricted: You do not have permission to edit the floor plan.';
     reRender();
     setTimeout(() => { accessError = null; reRender(); }, 3000);
     return;
@@ -394,7 +394,7 @@ window.openEditName = (e, tableId) => {
 };
 
 window.addTable = () => {
-  if (store.userRole !== 'owner') return;
+  if (store.userRole !== 'owner' && store.userRole !== 'cashier') return;
   const newTables = [...store.tables];
   const newId = `t${Date.now()}`;
   newTables.push({
@@ -409,7 +409,7 @@ window.addTable = () => {
 
 window.deleteTable = (e, id) => {
   e.stopPropagation();
-  if (store.userRole !== 'owner') return;
+  if (store.userRole !== 'owner' && store.userRole !== 'cashier') return;
   store.tables = store.tables.filter(t => t.id !== id);
   if (selectedTableId === id) selectedTableId = null;
   store.notify();

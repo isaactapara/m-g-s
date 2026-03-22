@@ -45,7 +45,7 @@ function renderMenu() {
     <div class="h-[calc(100vh-80px)] -m-4 md:-m-8 flex flex-col lg:flex-row overflow-hidden relative">
       
       <!-- Main Content Area (Menu Grid) -->
-      <div class="flex-1 flex flex-col overflow-hidden bg-gray-50/50 dark:bg-transparent relative">
+      <div class="flex-1 flex flex-col overflow-hidden bg-gray-50/30 dark:bg-black relative">
         <!-- Search & Actions Header -->
         <div class="p-6 border-b flex flex-wrap gap-4 items-center justify-between sticky top-0 z-10 backdrop-blur-md ${isDarkMode ? "bg-black/80 border-gray-900" : "bg-white/80 border-gray-200"}">
           <div class="flex items-center gap-4 flex-1 min-w-[300px]">
@@ -65,7 +65,7 @@ function renderMenu() {
                 <button onclick="window.setCategory('${cat}')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                   selectedCategory === cat
                     ? "bg-[#FF0000] text-white shadow-lg shadow-red-500/20"
-                    : "bg-gray-200 dark:bg-gray-950 border dark:border-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-900"
+                    : "bg-gray-200 dark:bg-black border dark:border-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-900"
                 }">
                   ${store.sanitize(cat)}
                 </button>
@@ -94,8 +94,8 @@ function renderMenu() {
               return `
                 <div class="rounded-[28px] p-6 flex flex-col justify-between shadow-xl border-2 transition-all relative group cursor-pointer ${
                     quantity > 0 
-                      ? "border-[#FF0000] " + (isDarkMode ? "bg-gray-950" : "bg-red-50/20") 
-                      : "border-transparent hover:border-gray-300 dark:hover:border-gray-700 " + (isDarkMode ? "bg-gray-950" : "bg-white")
+                      ? "border-[#FF0000] " + (isDarkMode ? "bg-black" : "bg-red-50/20") 
+                      : "border-transparent hover:border-gray-300 dark:hover:border-gray-700 " + (isDarkMode ? "bg-black" : "bg-white")
                   }" onclick="window.handleAdd('${item.id}')">
                   
                   ${userRole === 'owner' ? `
@@ -131,7 +131,7 @@ function renderMenu() {
                     </div>
                   </div>
 
-                  <div class="mt-8 flex items-center justify-between bg-gray-50 dark:bg-gray-950 border dark:border-gray-900 rounded-2xl p-2 relative z-10">
+                  <div class="mt-8 flex items-center justify-between bg-gray-50 dark:bg-black border dark:border-gray-900 rounded-2xl p-2 relative z-10">
                      ${quantity > 0 ? `
                         <div class="flex items-center gap-3 w-full justify-between" onclick="event.stopPropagation()">
                           <button 
@@ -164,7 +164,7 @@ function renderMenu() {
       </div>
 
       <!-- Checkout Sidebar (Right Side) -->
-      <div class="w-full lg:w-[450px] border-l flex flex-col p-8 lg:h-full shadow-2xl z-20 ${isDarkMode ? "bg-black/90 border-gray-900" : "bg-white border-gray-200"}">
+      <div class="w-full lg:w-[450px] border-l flex flex-col p-8 lg:h-full shadow-2xl z-20 ${isDarkMode ? "bg-black border-gray-900" : "bg-white border-gray-200"}">
         <div class="flex items-center justify-between mb-8">
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 bg-[#FF0000] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-500/20">
@@ -187,7 +187,7 @@ function renderMenu() {
               <p class="font-bold text-sm tracking-widest uppercase">Cart is empty</p>
             </div>
           ` : cart.map(item => `
-              <div class="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 dark:bg-black border dark:border-gray-900 relative group">
+              <div class="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 dark:bg-black/50 border dark:border-gray-900 relative group">
                 <div class="w-12 h-12 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center font-black text-[#FF0000] shadow-sm">
                   ${item.quantity}x
                 </div>
@@ -220,7 +220,7 @@ function renderMenu() {
               ${['M-Pesa', 'Cash'].map(method => `
                 <button onclick="window.setPayment('${method}')" class="flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
                   paymentMethod === method 
-                    ? "bg-white dark:bg-gray-950 shadow-sm text-gray-900 dark:text-white border dark:border-gray-900" 
+                    ? "bg-white dark:bg-black shadow-sm text-gray-900 dark:text-white border dark:border-gray-900" 
                     : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
                 }">
                   ${method}

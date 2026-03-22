@@ -116,8 +116,11 @@ const initiateSTKPush = async (req, res) => {
       });
     }
 
-    if (errorMessage.includes('Duplicate')) {
-       return res.status(400).json({ message: 'A similar request is already being processed. Please wait.' });
+    if (errorMessage.includes('Duplicate') || errorMessage.includes('AlreadyProcessed')) {
+       return res.status(409).json({ 
+         message: 'A similar transaction is already underway. Please wait a moment while we complete your initial request.',
+         code: 'DUPLICATE_REQUEST'
+       });
     }
 
     res.status(500).json({ 
@@ -128,6 +131,7 @@ const initiateSTKPush = async (req, res) => {
   }
 };
 
+// --- GLOBAL HELPERS ---
 const parseMpesaDate = (dateStr) => {
   if (!dateStr || String(dateStr).length < 14) return new Date();
   const s = String(dateStr);
@@ -142,6 +146,14 @@ const parseMpesaDate = (dateStr) => {
   } catch (e) {
     return new Date();
   }
+};
+
+const extractIdFromText = (text) => {
+    if (!text) return null;
+    const match = text.match(/[A-Z0-9]{10}/i); 
+    const found = match ? match[0].toUpperCase() : null;
+    if (found === 'SUCCESSFUL') return null; // Safe guard against sandbox status word
+    return found;
 };
 
 const handleCallback = async (req, res) => {
@@ -164,14 +176,8 @@ const handleCallback = async (req, res) => {
           return item ? item.Value : null;
       };
 
-      // REGEX EXTRACTOR: Final fallback if meta tags are missing
-      const extractIdFromText = (text) => {
-          if (!text) return null;
-          const match = text.match(/[A-Z0-9]{10}/); // Look for 10-char alphanumeric codes (UCM...)
-          return match ? match[0] : null;
-      };
 
-      const mpesaReceipt = getMeta('MpesaReceiptNumber') || getMeta('MpesaReceiptNo') || getMeta('ReceiptNo') || getMeta('TransactionID') || extractIdFromText(callbackData.ResultDesc);
+      const mpesaReceipt = getMeta('MpesaReceiptNumber') || getMeta('MpesaReceiptNo') || getMeta('ReceiptNo') || getMeta('TransactionID') || extractIdFromText(callbackData.ResultDesc) || extractIdFromText(JSON.stringify(req.body));
       const mpesaPhone = getMeta('PhoneNumber');
       const actualAmountPaid = Number(getMeta('Amount'));
       const rawDate = getMeta('TransactionDate');
@@ -194,7 +200,7 @@ const handleCallback = async (req, res) => {
               { status: 'PAID', mpesaReceiptNumber: { $exists: false } }
             ],
             total: { $gte: amountMatch - 1, $lte: amountMatch + 2 },
-            updatedAt: { $gt: new Date(Date.now() - 600000) } // Last 10 mins
+            updatedAt: { $gt: new Date(Date.now() - 1200000) } // Extended to 20 mins for sandbox lag
           }).sort({ updatedAt: -1 });
 
           if (pendingBill) {
@@ -294,7 +300,7 @@ const checkTransactionStatus = async (req, res) => {
 
     // Terminal Success
     if (code === '0') {
-      const extractedId = ResultDesc.match(/[A-Z0-9]{10}/) ? ResultDesc.match(/[A-Z0-9]{10}/)[0] : null;
+      const extractedId = extractIdFromText(ResultDesc);
       
       if (extractedId) {
         const updatedBill = await Bill.findByIdAndUpdate(billId, { 
@@ -317,17 +323,10 @@ const checkTransactionStatus = async (req, res) => {
     }
 
     // Terminal Failures (Instant Feedback)
-    const terminalFailures = [
-      '1',    // Insufficient Funds
-      '1032', // Cancelled by user
-      '1019', // Transaction expired
-      '1031', // Account locked
-      '2001', // Invalid PIN (Sandbox often treats this as terminal)
-      '9999'  // Internal Error
-    ];
-
-    if (terminalFailures.includes(code)) {
-      console.log(`❌ Terminal Failure Detected (Code ${code}): ${ResultDesc}`);
+    // We strictly wait for '0' (Success) or known "Waiting" codes
+    const waitingCodes = ['1037', 'CESS-1', 'CESS-3', '2001']; 
+    if (code !== '0' && !waitingCodes.includes(code)) {
+      console.log(`❌ Fail-Fast Triggered (Code ${code}): ${ResultDesc}`);
       const failedBill = await Bill.findByIdAndUpdate(billId, { 
         status: 'FAILED', 
         failureReason: ResultDesc 
@@ -335,18 +334,16 @@ const checkTransactionStatus = async (req, res) => {
       return res.json({ status: 'FAILED', bill: failedBill });
     }
 
-    // Still Processing / Waiting
-    const waitingCodes = ['1037', '2001', 'CESS-1', 'CESS-2'];
-    if (waitingCodes.includes(code)) {
-      return res.json({ status: 'PENDING', message: 'Still waiting for your PIN...' });
-    }
-
-    // Catch-all: If it's a known error code but not terminal, stay pending for a bit longer
-    console.log(`STK Query returned non-terminal code ${code} (${ResultDesc})`);
-    return res.json({ status: 'PENDING', message: ResultDesc });
+    // If Code is in waitingCodes, we stay PENDING
+    return res.json({ status: 'PENDING', message: 'Waiting for PIN...' });
 
   } catch (error) {
-    console.error('Status Query Error:', error.response?.data || error.message);
+    const errorData = error.response?.data;
+    if (errorData?.detail?.errorcode?.includes('ratelimit') || error.response?.status === 429) {
+      console.log(`[!] Safaricom Rate Limit hit for Bill ${req.body.billId}. Silencing with PENDING return.`);
+      return res.status(200).json({ status: 'PENDING', message: 'M-Pesa system busy, retrying...' });
+    }
+    console.error('Status Query Error:', errorData || error.message);
     res.status(500).json({ message: 'Failed to query M-Pesa status' });
   }
 };

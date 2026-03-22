@@ -311,7 +311,7 @@ class Store {
       return { ok: true, data };
     } catch (err) {
       console.error('STK Push Request Error:', err);
-      return { ok: false, data: err.response?.data };
+      return { ok: false, data: err.response?.data, status: err.response?.status };
     }
   }
 
@@ -320,7 +320,7 @@ class Store {
     
     return new Promise((resolve) => {
       let attempts = 0;
-      const maxAttempts = 50; 
+      const maxAttempts = 15; // 15 attempts * 13s = ~3.25 mins total
       
       this.pollingIntervals[billId] = setInterval(async () => {
         attempts++;
@@ -357,7 +357,7 @@ class Store {
         } catch (err) {
           console.error('Polling error:', err);
         }
-      }, 2000); // 2s for responsiveness
+      }, 13000); // 13s to stay under Safaricom Sandbox limit (5 calls/min)
     });
   }
 

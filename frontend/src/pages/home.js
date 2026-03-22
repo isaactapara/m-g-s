@@ -339,15 +339,22 @@ function renderHome() {
               <i data-lucide="x" class="w-16 h-16 stroke-[4]"></i>
             </div>
           ` : ''}
+
+          ${mpesaStatus === 'duplicate' ? `
+            <div class="w-32 h-32 rounded-full bg-white flex items-center justify-center text-amber-500 scale-in-center">
+              <i data-lucide="alert-circle" class="w-16 h-16 stroke-[4]"></i>
+            </div>
+          ` : ''}
         </div>
 
         <h2 class="text-4xl font-black mb-4 tracking-tight">
           ${mpesaStatus === 'sending' ? 'Sending Request...' : ''}
           ${mpesaStatus === 'pending' ? 'Waiting for PIN' : ''}
           ${mpesaStatus === 'verifying' ? 'Verifying Payment...' : ''}
-          ${mpesaStatus === 'verifying_id' ? 'Finalizing Receipt...' : ''}
+          ${mpesaStatus === 'verifying_id' ? 'Syncing Receipt ID...' : ''}
           ${mpesaStatus === 'success' ? 'Payment Verified!' : ''}
           ${mpesaStatus === 'error' ? 'Transaction Failed' : ''}
+          ${mpesaStatus === 'duplicate' ? 'Request in Progress' : ''}
         </h2>
 
         ${mpesaStatus === 'success' ? `
@@ -380,7 +387,7 @@ function renderHome() {
           <p class="mt-8 text-[10px] font-black uppercase tracking-widest opacity-50">Click anywhere to cancel</p>
         ` : ''}
 
-        ${mpesaStatus === 'error' ? `
+        ${(mpesaStatus === 'error' || mpesaStatus === 'duplicate') ? `
           <button onclick="window.closeMpesaError()" class="mt-12 px-8 py-4 bg-white text-[#FF0000] rounded-2xl font-black uppercase tracking-widest hover:bg-gray-100 transition-colors">
             Close & Try Again
           </button>
@@ -547,8 +554,13 @@ window.triggerStkPush = () => {
             reRender();
           }
         } else {
-          mpesaStatus = 'error';
-          mpesaError = res.data?.customerMessage || res.data?.message || 'Safaricom is currently unavailable. Please try again.';
+          if (res.status === 409 || res.data?.code === 'DUPLICATE_REQUEST') {
+            mpesaStatus = 'duplicate';
+            mpesaError = res.data?.message || 'A similar transaction is already underway. Please wait a moment.';
+          } else {
+            mpesaStatus = 'error';
+            mpesaError = res.data?.customerMessage || res.data?.message || 'Safaricom is currently unavailable. Please try again.';
+          }
           reRender();
         }
       } else {

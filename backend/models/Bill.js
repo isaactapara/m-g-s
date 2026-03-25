@@ -24,7 +24,7 @@ const billSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['PAID', 'PENDING', 'FAILED', 'CANCELLED', 'PARTIAL_PAYMENT_FLAGGED'],
+    enum: ['PAID', 'PENDING', 'FAILED', 'CANCELLED', 'PARTIAL_PAYMENT_FLAGGED', 'CONFIRMED'],
     default: 'PENDING'
   },
   mpesaReceiptNumber: String,

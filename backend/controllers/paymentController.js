@@ -19,6 +19,19 @@ const getPassword = (timestamp) => {
   return Buffer.from(rawString).toString('base64');
 };
 
+const ensureCallbackAuthorized = (req, res) => {
+  // In development/sandbox, skip auth checks for easier testing
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
+
+  const expectedSecret = process.env.MPESA_CALLBACK_SECRET;
+  if (!expectedSecret) return true; // safety: if unset, bypass checks (dev environment)
+
+  const provided = (req.headers['x-mpesa-callback-secret'] || req.headers['x-api-key'] || req.headers['x-callback-secret'] || '').trim();
+  return provided === expectedSecret;
+};
+
 let cachedToken = null;
 let tokenExpiry = null;
 
@@ -161,6 +174,12 @@ const extractIdFromText = (text) => {
 
 const handleCallback = async (req, res) => {
   console.log('--- M-PESA CALLBACK RECEIVED ---', JSON.stringify(req.body, null, 2));
+  console.log('Callback headers:', req.headers);
+
+  if (!ensureCallbackAuthorized(req, res)) {
+    console.warn('Unauthorized M-Pesa callback attempt detected');
+    return res.status(401).json({ message: 'Unauthorized callback' });
+  }
 
   try {
     const callbackData = req.body?.Body?.stkCallback;
@@ -187,7 +206,13 @@ const handleCallback = async (req, res) => {
 
       // 1. Fetch the original bill (Linkage)
       let pendingBill = await Bill.findOne({ checkoutRequestId });
-      
+
+      // Fallback: the bill may have only merchantRequestId in DB (rare). Try any in payload.
+      const merchantRequestId = callbackData.MerchantRequestID || callbackData.MerchantRequestId || req.body?.Body?.stkCallback?.MerchantRequestID;
+      if (!pendingBill && merchantRequestId) {
+        pendingBill = await Bill.findOne({ merchantRequestId });
+      }
+
       if (!pendingBill && Number(resultCode) === 0) {
         // [AUDIT] ORPHAN RECOVERY: If initiation timed out OR query was faster than webhook
         console.log(`[?] Orphan/Stale callback for ${checkoutRequestId}. Attempting fuzzy match...`);
@@ -219,15 +244,23 @@ const handleCallback = async (req, res) => {
         return res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });
       }
 
-      // 2. The Security Audit: Prevent the "One Shilling" Exploit
-      if (Math.round(Number(pendingBill.total)) !== Math.round(actualAmountPaid)) {
+      // Allow update from CONFIRMED to PAID
+      if (pendingBill.status !== 'PENDING' && pendingBill.status !== 'CONFIRMED') {
+        console.log(`Bill ${pendingBill.billNumber} already in status ${pendingBill.status}, skipping callback.`);
+        return res.status(200).json({ ResultCode: 0, ResultDesc: "Success" });
+      }
+
+      // 2. The Security Audit: Prevent obvious fraud while allowing small rounding differences
+      const tolerance = Number(process.env.MPESA_AMOUNT_TOLERANCE || 1);
+      if (Math.abs(Number(pendingBill.total) - actualAmountPaid) > tolerance) {
         await Bill.findOneAndUpdate(
           { checkoutRequestId }, 
           { 
             status: 'PARTIAL_PAYMENT_FLAGGED',
             mpesaReceiptNumber: mpesaReceipt,
             amountPaid: actualAmountPaid,
-            failureReason: `FRAUD ALERT: Expected ${pendingBill.total}, Received ${actualAmountPaid}`
+            failureReason: `FRAUD ALERT: Expected ${pendingBill.total}, Received ${actualAmountPaid}`,
+            amountDifference: Number((actualAmountPaid - pendingBill.total).toFixed(2))
           }
         );
         console.log(`FRAUD ATTEMPT: Bill ${pendingBill.billNumber} paid ${actualAmountPaid} instead of ${pendingBill.total}`);
@@ -264,6 +297,90 @@ const handleCallback = async (req, res) => {
   }
 };
 
+const queryTransactionStatus = async (bill) => {
+  if (!bill || !bill.checkoutRequestId) {
+    return { status: 'NOT_FOUND' };
+  }
+
+  if (bill.status !== 'PENDING' && bill.status !== 'CONFIRMED') {
+    return { status: bill.status, bill };
+  }
+
+  const token = await generateToken();
+  const timestamp = getTimestamp();
+  const password = getPassword(timestamp);
+
+  const payload = {
+    BusinessShortCode: process.env.MPESA_SHORTCODE,
+    Password: password,
+    Timestamp: timestamp,
+    CheckoutRequestID: bill.checkoutRequestId
+  };
+
+  const response = await axios.post(
+    'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+    payload,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  const { ResultCode, ResultDesc } = response.data;
+  console.log(`🔍 STK Query Full Response for ${bill._id}:`, JSON.stringify(response.data, null, 2));
+
+  const code = String(ResultCode);
+
+  if (code === '0') {
+    const extractedId = extractIdFromText(ResultDesc);
+
+    if (extractedId) {
+      const updatedBill = await Bill.findByIdAndUpdate(bill._id, {
+        status: 'PAID',
+        mpesaReceiptNumber: extractedId
+      }, { returnDocument: 'after' });
+      return { status: 'PAID', bill: updatedBill };
+    } else {
+      // In sandbox, receipt may not be in query response; set CONFIRMED and wait for callback
+      const confirmedBill = await Bill.findByIdAndUpdate(bill._id, {
+        status: 'CONFIRMED'
+      }, { returnDocument: 'after' });
+      return { status: 'CONFIRMED', bill: confirmedBill };
+    }
+  }
+
+  const terminalErrorCodes = [
+    '1','1032','1019','1031','2001','9999'
+  ];
+
+  if (terminalErrorCodes.includes(code)) {
+    const failedBill = await Bill.findByIdAndUpdate(bill._id, {
+      status: 'FAILED',
+      failureReason: ResultDesc
+    }, { returnDocument: 'after' });
+    return { status: 'FAILED', bill: failedBill };
+  }
+
+  return { status: 'PENDING', message: 'M-Pesa sync in progress...' };
+};
+
+const reconcilePendingTransactions = async () => {
+  const tenMinutesAgo = new Date(Date.now() - (10 * 60 * 1000));
+  const candidates = await Bill.find({
+    status: { $in: ['PENDING', 'CONFIRMED'] },
+    checkoutRequestId: { $exists: true, $ne: null },
+    updatedAt: { $lt: tenMinutesAgo }
+  }).limit(25);
+
+  for (const bill of candidates) {
+    try {
+      console.log(`🔁 Reconciling pending bill ${bill.billNumber} (ID: ${bill._id})`);
+      await queryTransactionStatus(bill);
+    } catch (err) {
+      console.error('Reconciliation job failed for bill', bill._id, err.message);
+    }
+  }
+
+  return candidates.length;
+};
+
 const checkTransactionStatus = async (req, res) => {
   const { billId } = req.body;
   if (!billId) return res.status(400).json({ message: 'Bill ID is required' });
@@ -274,32 +391,8 @@ const checkTransactionStatus = async (req, res) => {
       return res.status(404).json({ message: 'Transaction record not found' });
     }
 
-    // If already paid or failed, return early
-    if (bill.status !== 'PENDING') {
-      return res.json({ status: bill.status, bill });
-    }
-
-    const token = await generateToken();
-    const timestamp = getTimestamp();
-    const password = getPassword(timestamp);
-
-    const payload = {
-      BusinessShortCode: process.env.MPESA_SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      CheckoutRequestID: bill.checkoutRequestId
-    };
-
-    const response = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const { ResultCode, ResultDesc } = response.data;
-    console.log(`🔍 STK Query Full Response for ${billId}:`, JSON.stringify(response.data, null, 2));
-
-    const code = String(ResultCode);
+    const result = await queryTransactionStatus(bill);
+    return res.json(result);
 
     // Terminal Success
     if (code === '0') {
@@ -359,4 +452,4 @@ const checkTransactionStatus = async (req, res) => {
   }
 };
 
-module.exports = { initiateSTKPush, handleCallback, checkTransactionStatus };
+module.exports = { initiateSTKPush, handleCallback, checkTransactionStatus, reconcilePendingTransactions };

@@ -5,6 +5,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
+const { reconcilePendingTransactions } = require('./controllers/paymentController');
+
 const app = express();
 
 // Middleware
@@ -72,4 +74,16 @@ app.listen(PORT, async () => {
       console.error('Localtunnel failed:', err.message);
     }
   }
+
+  // Reconciliation scheduler to keep pending M-Pesa orders in sync
+  setInterval(async () => {
+    try {
+      const reconciled = await reconcilePendingTransactions();
+      if (reconciled > 0) {
+        console.log(`🔁 Reconciliation job processed ${reconciled} pending bill(s)`);
+      }
+    } catch (err) {
+      console.error('Reconciliation scheduler error:', err.message);
+    }
+  }, 3 * 60 * 1000); // every 3 minutes
 });

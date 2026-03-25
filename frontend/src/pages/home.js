@@ -175,7 +175,7 @@ function renderHome() {
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                ${allBills.filter(b => b.status !== 'PAID').slice(0, 5).map(bill => `
+                ${allBills.filter(b => b.status !== 'PAID' && b.status !== 'CONFIRMED').slice(0, 5).map(bill => `
                   <tr class="group hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-colors">
                     <td class="py-4 font-bold text-sm">
                       #${bill.billNumber}
@@ -189,7 +189,7 @@ function renderHome() {
                     </td>
                   </tr>
                 `).join('')}
-                ${allBills.filter(b => b.status !== 'PAID').length === 0 ? `
+                ${allBills.filter(b => b.status !== 'PAID' && b.status !== 'CONFIRMED').length === 0 ? `
                   <tr>
                     <td colspan="4" class="py-6 text-center text-xs font-bold text-gray-400">No pending bills</td>
                   </tr>
@@ -220,7 +220,7 @@ function renderHome() {
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-950">
-                ${allBills.filter(b => b.status === 'PAID').slice(0, 5).map(bill => `
+                ${allBills.filter(b => b.status === 'PAID' || b.status === 'CONFIRMED').slice(0, 5).map(bill => `
                   <tr class="group hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors">
                     <td class="py-4 font-bold text-sm">#${bill.billNumber}</td>
                     <td class="py-4 text-xs font-bold">${bill.paymentMethod}</td>
@@ -233,7 +233,7 @@ function renderHome() {
                     </td>
                   </tr>
                 `).join('')}
-                ${allBills.filter(b => b.status === 'PAID').length === 0 ? `
+                ${allBills.filter(b => b.status === 'PAID' || b.status === 'CONFIRMED').length === 0 ? `
                   <tr>
                     <td colspan="5" class="py-6 text-center text-xs font-bold text-gray-400">No settled bills</td>
                   </tr>
@@ -351,7 +351,6 @@ function renderHome() {
           ${mpesaStatus === 'sending' ? 'Sending Request...' : ''}
           ${mpesaStatus === 'pending' ? 'Waiting for PIN' : ''}
           ${mpesaStatus === 'verifying' ? 'Verifying Payment...' : ''}
-          ${mpesaStatus === 'verifying_id' ? 'Syncing Receipt ID...' : ''}
           ${mpesaStatus === 'success' ? 'Payment Verified!' : ''}
           ${mpesaStatus === 'error' ? 'Transaction Failed' : ''}
           ${mpesaStatus === 'duplicate' ? 'Request in Progress' : ''}
@@ -361,7 +360,7 @@ function renderHome() {
             <div class="mt-8 p-6 bg-white/10 rounded-3xl border border-white/20 backdrop-blur-md">
               <p class="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Transaction ID</p>
               <p class="text-2xl font-black font-mono tracking-tighter">
-                ${(store.bills.find(b => (b.id === activePollBillId || b._id === activePollBillId))?.mpesaReceiptNumber) || 'Verifying ID...'}
+                ${(store.bills.find(b => (b.id === activePollBillId || b._id === activePollBillId))?.mpesaReceiptNumber) || 'Syncing Receipt...'}
               </p>
             </div>
             <p class="mt-8 text-lg font-bold opacity-80 max-w-xs mx-auto">
@@ -372,7 +371,6 @@ function renderHome() {
               ${mpesaStatus === 'sending' ? 'Connecting to M-Pesa Gateway...' : ''}
               ${mpesaStatus === 'pending' ? `A prompt has been sent to <span class="underline">${mpesaPhone}</span>. Please complete it on your phone.` : ''}
               ${mpesaStatus === 'verifying' ? 'Verifying with Safaricom...' : ''}
-              ${mpesaStatus === 'verifying_id' ? 'Finalizing Receipt...' : ''}
               ${mpesaStatus === 'error' ? mpesaError : ''}
             </p>
         `}

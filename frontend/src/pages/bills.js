@@ -136,11 +136,11 @@ function renderBills() {
                   </td>
                   <td class="px-6 py-5 px-2">
                     <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      bill.status === 'PAID' 
+                      bill.status === 'PAID' || bill.status === 'CONFIRMED'
                         ? "bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400" 
                         : "bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
                     }">
-                      ${bill.status}
+                      ${bill.status === 'CONFIRMED' ? 'PAID' : bill.status}
                     </span>
                   </td>
                   <td class="px-6 py-5 text-right px-2">

@@ -321,7 +321,7 @@ class Store {
     return new Promise((resolve) => {
       let attempts = 0;
       let startTime = Date.now();
-      const maxDuration = 300000; // 5 minutes total
+      const maxDuration = 600000; // 10 minutes total
       
       const poll = async () => {
         // Stop if globally cancelled or completed
@@ -337,7 +337,7 @@ class Store {
           const status = res.status;
           const billData = res.bill || res;
 
-          if (status === 'PAID') {
+          if (status === 'PAID' || status === 'CONFIRMED') {
             this.stopPolling(billId);
             const updatedBill = this.normalizeBill(billData);
             const idx = this._bills.findIndex(b => (b._id || b.id) === billId);
@@ -345,8 +345,6 @@ class Store {
             this.notify();
             resolve({ success: true, bill: updatedBill });
             return;
-          } else if (status === 'SUCCESS_PENDING_ID') {
-            if (callback) callback('verifying_id');
           } else if (status === 'FAILED' || status === 'CANCELLED') {
              this.stopPolling(billId);
              resolve({ success: false, message: res.failureReason || 'Payment failed or was cancelled.' });
@@ -362,13 +360,13 @@ class Store {
           console.error('Polling network error (retrying):', err);
         }
 
-        // Schedule next poll adaptive interval
-        const elapsed = Date.now() - startTime;
-        const nextInterval = elapsed < 45000 ? 5000 : 13000; // 5s for first 45s, then 13s
+        // Schedule next poll with exponential backoff (capped, rate-limit friendly)
+        const backoffIntervals = [2000, 5000, 10000, 20000, 40000]; // 2s, 5s, 10s, 20s, 40s
+        const nextInterval = backoffIntervals[Math.min(attempts, backoffIntervals.length - 1)];
         this.pollingIntervals[billId] = setTimeout(poll, nextInterval);
       };
 
-      this.pollingIntervals[billId] = setTimeout(poll, 1000); // Start first poll after 1s
+      this.pollingIntervals[billId] = setTimeout(poll, 0); // Start first poll immediately
     });
   }
 

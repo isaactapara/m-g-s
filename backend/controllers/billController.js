@@ -22,11 +22,19 @@ const createBill = async (req, res) => {
   console.log('User:', req.user ? req.user.username : 'NO USER');
 
   try {
-    const { items, total, paymentMethod, status } = req.body;
-    
+    const { items, paymentMethod, status } = req.body;
+
     // 🛡️ SECURITY AUDIT & VALIDATION
     if (!items || items.length === 0) return res.status(400).json({ message: 'Cart is empty' });
-    if (!total || total <= 0) return res.status(400).json({ message: 'Invalid total amount' });
+
+    const computedTotal = items.reduce((sum, item) => {
+      if (!item || typeof item.price !== 'number' || item.price < 0 || !Number.isFinite(item.price) || !item.quantity || item.quantity <= 0) {
+        throw new Error('Invalid item structure');
+      }
+      return sum + (item.price * item.quantity);
+    }, 0);
+
+    if (computedTotal <= 0) return res.status(400).json({ message: 'Invalid total amount' });
 
     // Generate Formatted Bill Number: M&G's-0007-OP9C-22032026
     const count = await Bill.countDocuments();
@@ -45,7 +53,7 @@ const createBill = async (req, res) => {
     const bill = await Bill.create({
       billNumber: generatedBillNumber,
       items,
-      total,
+      total: Number(computedTotal.toFixed(2)),
       paymentMethod,
       status,
       cashier: req.user.username,

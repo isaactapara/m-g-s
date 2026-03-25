@@ -193,11 +193,18 @@ function renderReports() {
   const chartInfo = getChartData();
   const totalSales = chartInfo.salesData.reduce((sum, val) => sum + val, 0);
 
+  const driftCount = store.bills.filter(b => {
+    if (b.status !== 'PENDING' || !b.checkoutRequestId) return false;
+    const ageMs = Date.now() - new Date(b.updatedAt).getTime();
+    return ageMs > (10 * 60 * 1000); // >10m
+  }).length;
+
   const activeUser = store.currentUser ? store.currentUser.username : 'Offline';
 
   const stats = [
     { label: 'Total Sales', value: `${settings.currency} ${totalSales.toLocaleString()}`, icon: 'dollar-sign', growth: '+12.5%', positive: true },
-    { label: 'Active User', value: activeUser, icon: 'user', growth: 'Online Now', positive: true }
+    { label: 'Active User', value: activeUser, icon: 'user', growth: 'Online Now', positive: true },
+    { label: 'M-Pesa Reconciliation Drift', value: `${driftCount}`, icon: 'alert-triangle', growth: driftCount > 0 ? 'Immediate Action' : 'Good', positive: driftCount === 0 }
   ];
 
   const html = `

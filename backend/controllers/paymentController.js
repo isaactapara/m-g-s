@@ -1,6 +1,11 @@
 const axios = require('axios');
 const Bill = require('../models/Bill');
 
+// M-Pesa API Base URL (Production vs Sandbox)
+const MPESA_BASE_URL = process.env.NODE_ENV === 'production'
+  ? 'https://api.safaricom.co.ke'
+  : 'https://sandbox.safaricom.co.ke';
+
 const getTimestamp = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -45,7 +50,7 @@ const generateToken = async () => {
   const auth = Buffer.from(`${key}:${secret}`).toString('base64');
   
   const response = await axios.get(
-    'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+    `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
     { headers: { Authorization: `Basic ${auth}` } }
   );
   
@@ -318,7 +323,7 @@ const queryTransactionStatus = async (bill) => {
   };
 
   const response = await axios.post(
-    'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+    `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
     payload,
     { headers: { Authorization: `Bearer ${token}` } }
   );
@@ -336,12 +341,15 @@ const queryTransactionStatus = async (bill) => {
         status: 'PAID',
         mpesaReceiptNumber: extractedId
       }, { returnDocument: 'after' });
+      console.log(`Payment verified. Receipt: ${extractedId}`);
       return { status: 'PAID', bill: updatedBill };
     } else {
-      // In sandbox, receipt may not be in query response; set CONFIRMED and wait for callback
+      // In sandbox, receipt may not be in query response; set CONFIRMED and use CheckoutRequestID as receipt
       const confirmedBill = await Bill.findByIdAndUpdate(bill._id, {
-        status: 'CONFIRMED'
+        status: 'CONFIRMED',
+        mpesaReceiptNumber: bill.checkoutRequestId
       }, { returnDocument: 'after' });
+      console.log(`Payment verified. Receipt: ${bill.checkoutRequestId}`);
       return { status: 'CONFIRMED', bill: confirmedBill };
     }
   }
